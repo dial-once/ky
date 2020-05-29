@@ -14,7 +14,7 @@ export type LiteralUnion<
 
 export type Input = Request | URL | string;
 
-export type Headers = { [key: string]: string };
+// export type Headers = { [key: string]: string };
 
 export type BeforeRequestHook = (
 	request: Request,

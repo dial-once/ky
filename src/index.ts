@@ -1,83 +1,40 @@
 /*! MIT License © Arthur Yeti */
 
 import type {
-  Headers,
+  // Headers,
   Input,
   RetryOptions,
   Options,
   GivenOptions,
 } from './types'
 
-const globals: any = {};
-
-const getGlobal = (property: string): any => {
-	/* istanbul ignore next */
-	if (typeof self !== 'undefined' && self && property in self) {
-		return self;
-	}
-
-	/* istanbul ignore next */
-	if (typeof window !== 'undefined' && window && property in window) {
-		return window;
-	}
-
-	if (typeof global !== 'undefined' && global && property in global) {
-		return global;
-	}
-
-	/* istanbul ignore next */
-	if (typeof globalThis !== 'undefined' && globalThis) {
-		return globalThis;
-  }
-};
-
-const globalProperties = [
-	'Headers',
-	'Request',
-	'Response',
-	'ReadableStream',
-	'fetch',
-	'AbortController',
-	'FormData'
-];
-
-for (const property of globalProperties) {
-	Object.defineProperty(globals, property, {
-		get() {
-			const globalObject = getGlobal(property);
-			const value = globalObject && globalObject[property];
-			return typeof value === 'function' ? value.bind(globalObject) : value;
-		}
-	});
-}
-
 function isObject (value: any): boolean {
   return value !== null && typeof value === 'object';
 }
 
-const supportsAbortController = typeof globals.AbortController === 'function';
-const supportsStreams = typeof globals.ReadableStream === 'function';
-const supportsFormData = typeof globals.FormData === 'function';
+const supportsAbortController = typeof AbortController === 'function';
+const supportsStreams = typeof ReadableStream === 'function';
+const supportsFormData = typeof FormData === 'function';
 
-function mergeHeaders<TObject extends Headers, TSource extends Headers>(source1: Headers, source2: Headers): TObject & TSource {
-	const result = new globals.Headers(source1);
-	const isHeadersInstance = source2 instanceof globals.Headers;
-	const source = new globals.Headers(source2);
+function mergeHeaders<TObject extends Headers, TSource extends Headers>(source1: Headers, source2: Headers): Headers {
+	const result = new Headers(source1);
+	const isHeadersInstance = source2 instanceof Headers;
+	const source = new Headers(source2);
 
-	for (const [key, value] of source) {
+	source.forEach((value, key) => {
 		if ((isHeadersInstance && value === 'undefined') || value === undefined) {
 			result.delete(key);
 		} else {
 			result.set(key, value);
 		}
-	}
+	});
 
 	return result;
 };
 
 function deepMerge(...sources: any) {
 	let returnValue: any[] | any = {};
-	let headers: Headers = {};
+	let headers: Headers = new Headers();
 
 	for (const source of sources) {
 		if (Array.isArray(source)) {
@@ -113,7 +70,7 @@ const requestMethods = [
 	'patch',
 	'head',
 	'delete'
-];
+] as const;
 
 const responseTypes = {
 	json: 'application/json',
@@ -199,7 +156,7 @@ const timeout = (promise: Promise<any>, ms: number, abortController: AbortContro
 	});
 
 function normalizeRequestMethod(input: string): string {
-  return requestMethods.includes(input) ? input.toUpperCase() : input;
+  return requestMethods.includes(input as any) ? input.toUpperCase() : input;
 }
 
 const defaultRetryOptions = {
@@ -240,7 +197,7 @@ class Ky {
   protected _input: Input;
   protected _options: Options;
   public abortController?: AbortController;
-  public request?: Request;
+  public request: Request;
 
 	constructor(input: Input, options: GivenOptions = {}) {
 		this._retryCount = 0;
@@ -249,7 +206,7 @@ class Ky {
 			// TODO: credentials can be removed when the spec change is implemented in all browsers. Context: https://www.chromestatus.com/feature/4539473312350208
 			credentials: (this._input as Request).credentials || 'same-origin',
 			...options,
-			headers: mergeHeaders((this._input as any).headers || {}, (options as any).headers || {}),
+			headers: mergeHeaders(this._input.headers || {}, options.headers || {}),
 			hooks: deepMerge({
 				beforeRequest: [],
 				beforeRetry: [],
@@ -262,7 +219,7 @@ class Ky {
 			timeout: typeof options.timeout === 'undefined' ? 10000 : options.timeout
 		};
 
-		if (typeof this._input !== 'string' && !(this._input instanceof URL || this._input instanceof globals.Request)) {
+		if (typeof this._input !== 'string' && !(this._input instanceof URL || this._input instanceof Request)) {
 			throw new TypeError('`input` must be a string, URL, or Request');
 		}
 
@@ -279,7 +236,7 @@ class Ky {
 		}
 
 		if (supportsAbortController) {
-			this.abortController = new globals.AbortController();
+			this.abortController = new AbortController();
 			if (this._options.signal) {
 				this._options.signal.addEventListener('abort', () => {
 					this.abortController?.abort();
@@ -289,35 +246,35 @@ class Ky {
 			this._options.signal = this.abortController?.signal;
 		}
 
-		this.request = new globals.Request(this._input, this._options);
+		this.request = new Request(this._input, this._options);
 
 		if (this._options.searchParams) {
 			const url = new URL(this.request?.url as string);
 			url.search = new URLSearchParams((this._options as URL).searchParams).toString();
 
 			// To provide correct form boundary, Content-Type header should be deleted each time when new Request instantiated from another one
-			if (((supportsFormData && this._options.body instanceof globals.FormData) || this._options.body instanceof URLSearchParams) && !(this._options.headers && (this._options as any).headers['content-type'])) {
-				(this.request as any).headers.delete('content-type');
+			if (((supportsFormData && this._options.body instanceof FormData) || this._options.body instanceof URLSearchParams) && !(this._options.headers && this._options.headers['content-type'])) {
+				this.request.headers.delete('content-type');
 			}
 
-			this.request = new globals.Request(new globals.Request(url, this.request), this._options);
+			this.request = new Request(new Request(url, this.request), this._options);
 		}
 
 		if (this._options.json !== undefined) {
 			this._options.body = JSON.stringify(this._options.json);
-			(this.request as any).headers.set('content-type', 'application/json');
-			this.request = new globals.Request(this.request, {body: this._options.body});
+			this.request.headers.set('content-type', 'application/json');
+			this.request = new Request(this.request, {body: this._options.body});
 		}
 
 		const fn = async () => {
-			if ((this._options as any).timeout > maxSafeTimeout) {
+			if (this._options.timeout > maxSafeTimeout) {
 				throw new RangeError(`The \`timeout\` option cannot be greater than ${maxSafeTimeout}`);
 			}
 
 			await delay(1);
 			let response = await this._fetch();
 
-			for (const hook of (this._options as any).hooks.afterResponse) {
+			for (const hook of this._options.hooks.afterResponse) {
 				// eslint-disable-next-line no-await-in-loop
 				const modifiedResponse = await hook(
 					this.request,
@@ -325,7 +282,7 @@ class Ky {
 					response.clone()
 				);
 
-				if (modifiedResponse instanceof globals.Response) {
+				if (modifiedResponse instanceof Response) {
 					response = modifiedResponse;
 				}
 			}
@@ -351,31 +308,31 @@ class Ky {
 			return response;
 		};
 
-		const isRetriableMethod = (this._options as any).retry.methods.includes((this.request as any).method.toLowerCase());
+		const isRetriableMethod = this._options.retry.methods.includes(this.request.method.toLowerCase());
 		const result = isRetriableMethod ? this._retry(fn) : fn();
 
 		for (const [type, mimeType] of Object.entries(responseTypes)) {
-			(result as any)[type] = async () => {
-				(this.request as any).headers.set('accept', (this.request as any).headers.get('accept') || mimeType);
+			result[type] = async () => {
+				this.request.headers.set('accept', this.request.headers.get('accept') || mimeType);
 				const response = (await result).clone();
 				return (type === 'json' && response.status === 204) ? '' : response[type]();
 			};
 		}
 
-		return result as any;
+		return result;
 	}
 
 	_calculateRetryDelay(error: any) {
 		this._retryCount++;
 
-		if (this._retryCount < (this._options as any).retry.limit && !(error instanceof TimeoutError)) {
+		if (this._retryCount < this._options.retry.limit && !(error instanceof TimeoutError)) {
 			if (error instanceof HTTPError) {
-				if (!(this._options as any).retry.statusCodes.includes(error.response.status)) {
+				if (!this._options.retry.statusCodes.includes(error.response.status)) {
 					return 0;
 				}
 
 				const retryAfter = error.response.headers.get('Retry-After');
-				if (retryAfter && (this._options as any).retry.afterStatusCodes.includes(error.response.status)) {
+				if (retryAfter && this._options.retry.afterStatusCodes.includes(error.response.status)) {
 					let after = Number(retryAfter);
 					if (Number.isNaN(after)) {
 						after = Date.parse(retryAfter) - Date.now();
@@ -383,7 +340,7 @@ class Ky {
 						after *= 1000;
 					}
 
-					if (typeof (this._options as any).retry.maxRetryAfter !== 'undefined' && after > (this._options as any).retry.maxRetryAfter) {
+					if (typeof this._options.retry.maxRetryAfter !== 'undefined' && after > this._options.retry.maxRetryAfter) {
 						return 0;
 					}
 
@@ -410,7 +367,7 @@ class Ky {
 			if (ms !== 0 && this._retryCount > 0) {
 				await delay(ms);
 
-				for (const hook of (this._options as any).hooks.beforeRetry) {
+				for (const hook of this._options.hooks.beforeRetry) {
 					// eslint-disable-next-line no-await-in-loop
 					const hookResult = await hook({
 						request: this.request,
@@ -436,7 +393,7 @@ class Ky {
 	}
 
 	async _fetch() {
-		for (const hook of (this._options as any).hooks.beforeRequest) {
+		for (const hook of this._options.hooks.beforeRequest) {
 			// eslint-disable-next-line no-await-in-loop
 			const result = await hook(this.request, this._options);
 
@@ -451,10 +408,10 @@ class Ky {
 		}
 
 		if (this._options.timeout === false) {
-			return globals.fetch(this.request?.clone());
+			return fetch(this.request?.clone());
 		}
 
-		return timeout(globals.fetch(this.request?.clone()), (this._options as any).timeout, this.abortController as any);
+		return timeout(fetch(this.request?.clone()), this._options.timeout, this.abortController);
 	}
 
 	/* istanbul ignore next */
@@ -462,8 +419,8 @@ class Ky {
 		const totalBytes = Number(response.headers.get('content-length')) || 0;
 		let transferredBytes = 0;
 
-		return new globals.Response(
-			new globals.ReadableStream({
+		return new Response(
+			new ReadableStream({
 				start(controller: any) {
 					const reader = response.body.getReader();
 
@@ -509,7 +466,7 @@ const createInstance = (defaults?: any) => {
 	const ky = (input: any, options: any) => new Ky(input, validateAndMerge(defaults, options));
 
 	for (const method of requestMethods) {
-    (ky as any)[method] = (input: any, options: any): any => new Ky(input, validateAndMerge(defaults, options, {method}));
+    ky[method] = (input: any, options: any): any => new Ky(input, validateAndMerge(defaults, options, {method}));
 	}
 
 	ky.HTTPError = HTTPError;
