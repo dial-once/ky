@@ -1,16 +1,24 @@
-/// <reference lib="dom"/>
+export type Primitive =
+	| null
+	| undefined
+	| string
+	| number
+	| boolean
+	| symbol
+	| bigint;
 
-type Primitive = null | undefined | string | number | boolean | symbol | bigint;
-
-type LiteralUnion<LiteralType extends BaseType, BaseType extends Primitive> =
-	| LiteralType
-	| (BaseType & {_?: never});
+export type LiteralUnion<
+	LiteralType extends BaseType,
+	BaseType extends Primitive
+> = LiteralType | (BaseType & { _?: never });
 
 export type Input = Request | URL | string;
 
+export type Headers = { [key: string]: string };
+
 export type BeforeRequestHook = (
 	request: Request,
-	options: NormalizedOptions,
+	options: NormalizedOptions
 ) => Request | Response | void | Promise<Request | Response | void>;
 
 export type BeforeRetryHook = (options: {
@@ -24,7 +32,7 @@ export type BeforeRetryHook = (options: {
 export type AfterResponseHook = (
 	request: Request,
 	options: NormalizedOptions,
-	response: Response,
+	response: Response
 ) => Response | void | Promise<Response | void>;
 
 export interface DownloadProgress {
@@ -154,13 +162,16 @@ export interface RetryOptions {
 /**
 Options are the same as `window.fetch`, with some exceptions.
 */
-export interface Options extends Omit<RequestInit, 'headers'> {
+export interface Options extends Omit<RequestInit, "headers"> {
 	/**
 	HTTP method used to make the request.
 
 	Internally, the standard methods (`GET`, `POST`, `PUT`, `PATCH`, `HEAD` and `DELETE`) are uppercased in order to avoid server errors due to case sensitivity.
 	*/
-	method?: LiteralUnion<'get' | 'post' | 'put' | 'delete' | 'patch' | 'head', string>;
+	method?: LiteralUnion<
+		"get" | "post" | "put" | "delete" | "patch" | "head",
+		string
+	>;
 
 	/**
 	HTTP headers used to make the request.
@@ -197,7 +208,7 @@ export interface Options extends Omit<RequestInit, 'headers'> {
 	//=> true
 	```
 	*/
-	headers?: HeadersInit | {[key: string]: undefined};
+	headers?: HeadersInit | { [key: string]: undefined };
 
 	/**
 	Shortcut for sending JSON. Use this instead of the `body` option.
@@ -211,7 +222,11 @@ export interface Options extends Omit<RequestInit, 'headers'> {
 
 	Accepts any value supported by [`URLSearchParams()`](https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams/URLSearchParams).
 	*/
-	searchParams?: string | {[key: string]: string | number | boolean} | Array<Array<string | number | boolean>> | URLSearchParams;
+	searchParams?:
+		| string
+		| { [key: string]: string | number | boolean }
+		| Array<Array<string | number | boolean>>
+		| URLSearchParams;
 
 	/**
 	A prefix to prepend to the `input` URL when making the request. It can be any valid URL, either relative or absolute. A trailing slash `/` is optional and will be added automatically, if needed, when it is joined with `input`. Only takes effect when `input` is a string. The `input` argument cannot start with a slash `/` when using this option.
@@ -311,18 +326,20 @@ export interface Options extends Omit<RequestInit, 'headers'> {
 	onDownloadProgress?: (progress: DownloadProgress, chunk: Uint8Array) => void;
 }
 
+export interface GivenOptions extends Options {}
+
 /**
 Normalized options passed to the `fetch` call and the `beforeRequest` hooks.
 */
 export interface NormalizedOptions extends RequestInit {
 	// Extended from `RequestInit`, but ensured to be set (not optional).
-	method: RequestInit['method'];
-	credentials: RequestInit['credentials'];
+	method: RequestInit["method"];
+	credentials: RequestInit["credentials"];
 
 	// Extended from custom `KyOptions`, but ensured to be set (not optional).
-	retry: Options['retry'];
-	prefixUrl: Options['prefixUrl'];
-	onDownloadProgress: Options['onDownloadProgress'];
+	retry: Options["retry"];
+	prefixUrl: Options["prefixUrl"];
+	onDownloadProgress: Options["onDownloadProgress"];
 }
 
 /**
@@ -366,17 +383,17 @@ export interface ResponsePromise extends Promise<Response> {
 /**
 The error has a response property with the `Response` object.
 */
-declare class HTTPError extends Error {
-	constructor(response: Response);
-	response: Response;
-}
+// declare class HTTPError extends Error {
+// 	constructor(response: Response);
+// 	response: Response;
+// }
 
-/**
-The error thrown when the request times out.
-*/
-declare class TimeoutError extends Error {
-	constructor();
-}
+// /**
+// The error thrown when the request times out.
+// */
+// declare class TimeoutError extends Error {
+// 	constructor();
+// }
 
 declare const ky: {
 	/**
@@ -488,13 +505,11 @@ declare const ky: {
 	```
 	*/
 	readonly stop: unique symbol;
-	readonly TimeoutError: typeof TimeoutError;
-	readonly HTTPError: typeof HTTPError;
+	// readonly TimeoutError: typeof TimeoutError;
+	// readonly HTTPError: typeof HTTPError;
 };
 
-declare namespace ky {
-	export type TimeoutError = InstanceType<typeof TimeoutError>;
-	export type HTTPError = InstanceType<typeof HTTPError>;
-}
-
-export default ky;
+// declare namespace ky {
+// 	export type TimeoutError = InstanceType<typeof TimeoutError>;
+// 	export type HTTPError = InstanceType<typeof HTTPError>;
+// }

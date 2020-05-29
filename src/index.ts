@@ -1,8 +1,16 @@
-/*! MIT License © Sindre Sorhus */
+/*! MIT License © Arthur Yeti */
 
-const globals = {};
+import type {
+  Headers,
+  Input,
+  RetryOptions,
+  Options,
+  GivenOptions,
+} from './types'
 
-const getGlobal = property => {
+const globals: any = {};
+
+const getGlobal = (property: string): any => {
 	/* istanbul ignore next */
 	if (typeof self !== 'undefined' && self && property in self) {
 		return self;
@@ -20,7 +28,7 @@ const getGlobal = property => {
 	/* istanbul ignore next */
 	if (typeof globalThis !== 'undefined' && globalThis) {
 		return globalThis;
-	}
+  }
 };
 
 const globalProperties = [
@@ -43,12 +51,15 @@ for (const property of globalProperties) {
 	});
 }
 
-const isObject = value => value !== null && typeof value === 'object';
+function isObject (value: any): boolean {
+  return value !== null && typeof value === 'object';
+}
+
 const supportsAbortController = typeof globals.AbortController === 'function';
 const supportsStreams = typeof globals.ReadableStream === 'function';
 const supportsFormData = typeof globals.FormData === 'function';
 
-const mergeHeaders = (source1, source2) => {
+function mergeHeaders<TObject extends Headers, TSource extends Headers>(source1: Headers, source2: Headers): TObject & TSource {
 	const result = new globals.Headers(source1);
 	const isHeadersInstance = source2 instanceof globals.Headers;
 	const source = new globals.Headers(source2);
@@ -64,9 +75,9 @@ const mergeHeaders = (source1, source2) => {
 	return result;
 };
 
-const deepMerge = (...sources) => {
-	let returnValue = {};
-	let headers = {};
+function deepMerge(...sources: any) {
+	let returnValue: any[] | any = {};
+	let headers: Headers = {};
 
 	for (const source of sources) {
 		if (Array.isArray(source)) {
@@ -140,7 +151,9 @@ const retryAfterStatusCodes = [
 const stop = Symbol('stop');
 
 class HTTPError extends Error {
-	constructor(response) {
+  response: Response;
+
+	constructor(response: Response) {
 		// Set the message to the status text, such as Unauthorized,
 		// with some fallbacks. This message should never be undefined.
 		super(
@@ -162,10 +175,10 @@ class TimeoutError extends Error {
 	}
 }
 
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // `Promise.race()` workaround (#91)
-const timeout = (promise, ms, abortController) =>
+const timeout = (promise: Promise<any>, ms: number, abortController: AbortController) =>
 	new Promise((resolve, reject) => {
 		const timeoutID = setTimeout(() => {
 			if (abortController) {
@@ -185,7 +198,9 @@ const timeout = (promise, ms, abortController) =>
 		/* eslint-enable promise/prefer-await-to-then */
 	});
 
-const normalizeRequestMethod = input => requestMethods.includes(input) ? input.toUpperCase() : input;
+function normalizeRequestMethod(input: string): string {
+  return requestMethods.includes(input) ? input.toUpperCase() : input;
+}
 
 const defaultRetryOptions = {
 	limit: 2,
@@ -194,7 +209,7 @@ const defaultRetryOptions = {
 	afterStatusCodes: retryAfterStatusCodes
 };
 
-const normalizeRetryOptions = (retry = {}) => {
+const normalizeRetryOptions = (retry: RetryOptions | number = {}) => {
 	if (typeof retry === 'number') {
 		return {
 			...defaultRetryOptions,
@@ -221,20 +236,26 @@ const normalizeRetryOptions = (retry = {}) => {
 const maxSafeTimeout = 2147483647;
 
 class Ky {
-	constructor(input, options = {}) {
+  protected _retryCount: number;
+  protected _input: Input;
+  protected _options: Options;
+  public abortController?: AbortController;
+  public request?: Request;
+
+	constructor(input: Input, options: GivenOptions = {}) {
 		this._retryCount = 0;
 		this._input = input;
 		this._options = {
 			// TODO: credentials can be removed when the spec change is implemented in all browsers. Context: https://www.chromestatus.com/feature/4539473312350208
-			credentials: this._input.credentials || 'same-origin',
+			credentials: (this._input as Request).credentials || 'same-origin',
 			...options,
-			headers: mergeHeaders(this._input.headers, options.headers),
+			headers: mergeHeaders((this._input as any).headers || {}, (options as any).headers || {}),
 			hooks: deepMerge({
 				beforeRequest: [],
 				beforeRetry: [],
 				afterResponse: []
 			}, options.hooks),
-			method: normalizeRequestMethod(options.method || this._input.method),
+			method: normalizeRequestMethod(options.method || (this._input as Request).method),
 			prefixUrl: String(options.prefixUrl || ''),
 			retry: normalizeRetryOptions(options.retry),
 			throwHttpErrors: options.throwHttpErrors !== false,
@@ -250,7 +271,7 @@ class Ky {
 				throw new Error('`input` must not begin with a slash when using `prefixUrl`');
 			}
 
-			if (!this._options.prefixUrl.endsWith('/')) {
+			if (!(this._options.prefixUrl as string).endsWith('/')) {
 				this._options.prefixUrl += '/';
 			}
 
@@ -261,22 +282,22 @@ class Ky {
 			this.abortController = new globals.AbortController();
 			if (this._options.signal) {
 				this._options.signal.addEventListener('abort', () => {
-					this.abortController.abort();
+					this.abortController?.abort();
 				});
 			}
 
-			this._options.signal = this.abortController.signal;
+			this._options.signal = this.abortController?.signal;
 		}
 
 		this.request = new globals.Request(this._input, this._options);
 
 		if (this._options.searchParams) {
-			const url = new URL(this.request.url);
-			url.search = new URLSearchParams(this._options.searchParams);
+			const url = new URL(this.request?.url as string);
+			url.search = new URLSearchParams((this._options as URL).searchParams).toString();
 
 			// To provide correct form boundary, Content-Type header should be deleted each time when new Request instantiated from another one
-			if (((supportsFormData && this._options.body instanceof globals.FormData) || this._options.body instanceof URLSearchParams) && !(this._options.headers && this._options.headers['content-type'])) {
-				this.request.headers.delete('content-type');
+			if (((supportsFormData && this._options.body instanceof globals.FormData) || this._options.body instanceof URLSearchParams) && !(this._options.headers && (this._options as any).headers['content-type'])) {
+				(this.request as any).headers.delete('content-type');
 			}
 
 			this.request = new globals.Request(new globals.Request(url, this.request), this._options);
@@ -284,19 +305,19 @@ class Ky {
 
 		if (this._options.json !== undefined) {
 			this._options.body = JSON.stringify(this._options.json);
-			this.request.headers.set('content-type', 'application/json');
+			(this.request as any).headers.set('content-type', 'application/json');
 			this.request = new globals.Request(this.request, {body: this._options.body});
 		}
 
 		const fn = async () => {
-			if (this._options.timeout > maxSafeTimeout) {
+			if ((this._options as any).timeout > maxSafeTimeout) {
 				throw new RangeError(`The \`timeout\` option cannot be greater than ${maxSafeTimeout}`);
 			}
 
 			await delay(1);
 			let response = await this._fetch();
 
-			for (const hook of this._options.hooks.afterResponse) {
+			for (const hook of (this._options as any).hooks.afterResponse) {
 				// eslint-disable-next-line no-await-in-loop
 				const modifiedResponse = await hook(
 					this.request,
@@ -330,31 +351,31 @@ class Ky {
 			return response;
 		};
 
-		const isRetriableMethod = this._options.retry.methods.includes(this.request.method.toLowerCase());
+		const isRetriableMethod = (this._options as any).retry.methods.includes((this.request as any).method.toLowerCase());
 		const result = isRetriableMethod ? this._retry(fn) : fn();
 
 		for (const [type, mimeType] of Object.entries(responseTypes)) {
-			result[type] = async () => {
-				this.request.headers.set('accept', this.request.headers.get('accept') || mimeType);
+			(result as any)[type] = async () => {
+				(this.request as any).headers.set('accept', (this.request as any).headers.get('accept') || mimeType);
 				const response = (await result).clone();
 				return (type === 'json' && response.status === 204) ? '' : response[type]();
 			};
 		}
 
-		return result;
+		return result as any;
 	}
 
-	_calculateRetryDelay(error) {
+	_calculateRetryDelay(error: any) {
 		this._retryCount++;
 
-		if (this._retryCount < this._options.retry.limit && !(error instanceof TimeoutError)) {
+		if (this._retryCount < (this._options as any).retry.limit && !(error instanceof TimeoutError)) {
 			if (error instanceof HTTPError) {
-				if (!this._options.retry.statusCodes.includes(error.response.status)) {
+				if (!(this._options as any).retry.statusCodes.includes(error.response.status)) {
 					return 0;
 				}
 
 				const retryAfter = error.response.headers.get('Retry-After');
-				if (retryAfter && this._options.retry.afterStatusCodes.includes(error.response.status)) {
+				if (retryAfter && (this._options as any).retry.afterStatusCodes.includes(error.response.status)) {
 					let after = Number(retryAfter);
 					if (Number.isNaN(after)) {
 						after = Date.parse(retryAfter) - Date.now();
@@ -362,7 +383,7 @@ class Ky {
 						after *= 1000;
 					}
 
-					if (typeof this._options.retry.maxRetryAfter !== 'undefined' && after > this._options.retry.maxRetryAfter) {
+					if (typeof (this._options as any).retry.maxRetryAfter !== 'undefined' && after > (this._options as any).retry.maxRetryAfter) {
 						return 0;
 					}
 
@@ -381,7 +402,7 @@ class Ky {
 		return 0;
 	}
 
-	async _retry(fn) {
+	async _retry(fn: any): Promise<any> {
 		try {
 			return await fn();
 		} catch (error) {
@@ -389,7 +410,7 @@ class Ky {
 			if (ms !== 0 && this._retryCount > 0) {
 				await delay(ms);
 
-				for (const hook of this._options.hooks.beforeRetry) {
+				for (const hook of (this._options as any).hooks.beforeRetry) {
 					// eslint-disable-next-line no-await-in-loop
 					const hookResult = await hook({
 						request: this.request,
@@ -415,7 +436,7 @@ class Ky {
 	}
 
 	async _fetch() {
-		for (const hook of this._options.hooks.beforeRequest) {
+		for (const hook of (this._options as any).hooks.beforeRequest) {
 			// eslint-disable-next-line no-await-in-loop
 			const result = await hook(this.request, this._options);
 
@@ -430,20 +451,20 @@ class Ky {
 		}
 
 		if (this._options.timeout === false) {
-			return globals.fetch(this.request.clone());
+			return globals.fetch(this.request?.clone());
 		}
 
-		return timeout(globals.fetch(this.request.clone()), this._options.timeout, this.abortController);
+		return timeout(globals.fetch(this.request?.clone()), (this._options as any).timeout, this.abortController as any);
 	}
 
 	/* istanbul ignore next */
-	_stream(response, onDownloadProgress) {
+	_stream(response: any, onDownloadProgress: any) {
 		const totalBytes = Number(response.headers.get('content-length')) || 0;
 		let transferredBytes = 0;
 
 		return new globals.Response(
 			new globals.ReadableStream({
-				start(controller) {
+				start(controller: any) {
 					const reader = response.body.getReader();
 
 					if (onDownloadProgress) {
@@ -474,7 +495,7 @@ class Ky {
 	}
 }
 
-const validateAndMerge = (...sources) => {
+const validateAndMerge = (...sources: any) => {
 	for (const source of sources) {
 		if ((!isObject(source) || Array.isArray(source)) && typeof source !== 'undefined') {
 			throw new TypeError('The `options` argument must be an object');
@@ -484,17 +505,17 @@ const validateAndMerge = (...sources) => {
 	return deepMerge({}, ...sources);
 };
 
-const createInstance = defaults => {
-	const ky = (input, options) => new Ky(input, validateAndMerge(defaults, options));
+const createInstance = (defaults?: any) => {
+	const ky = (input: any, options: any) => new Ky(input, validateAndMerge(defaults, options));
 
 	for (const method of requestMethods) {
-		ky[method] = (input, options) => new Ky(input, validateAndMerge(defaults, options, {method}));
+    (ky as any)[method] = (input: any, options: any): any => new Ky(input, validateAndMerge(defaults, options, {method}));
 	}
 
 	ky.HTTPError = HTTPError;
 	ky.TimeoutError = TimeoutError;
-	ky.create = newDefaults => createInstance(validateAndMerge(newDefaults));
-	ky.extend = newDefaults => createInstance(validateAndMerge(defaults, newDefaults));
+	ky.create = (newDefaults: any) => createInstance(validateAndMerge(newDefaults));
+	ky.extend = (newDefaults: any) => createInstance(validateAndMerge(defaults, newDefaults));
 	ky.stop = stop;
 
 	return ky;

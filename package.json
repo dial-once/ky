@@ -14,16 +14,12 @@
 		"node": ">=10"
 	},
 	"scripts": {
-		"build": "rollup index.js --format=umd --name=ky --file=umd.js",
+		"build": "rimraf lib && tsc --build tsconfig.json",
 		"prepare": "npm run build",
 		"test": "xo && npm run build && nyc ava && tsd"
 	},
-	"files": [
-		"index.js",
-		"index.d.ts",
-		"umd.js",
-		"umd.d.ts"
-	],
+	"main": "lib/index.js",
+	"types": "src/index.d.ts",
 	"keywords": [
 		"fetch",
 		"request",
@@ -61,6 +57,7 @@
 		"puppeteer": "^3.0.4",
 		"rollup": "^2.10.2",
 		"tsd": "^0.11.0",
+		"typescript": "^3.9.3",
 		"xo": "^0.25.3"
 	},
 	"sideEffects": false,
@@ -77,5 +74,8 @@
 			"esm",
 			"./test/_require"
 		]
+	},
+	"dependencies": {
+		"tslib": "^2.0.0"
 	}
 }
